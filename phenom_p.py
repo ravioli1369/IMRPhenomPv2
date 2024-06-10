@@ -103,7 +103,7 @@ def PhenomPOneFrequency(
     
     phase, _ = phenom_d_phase(Mf, m1, m2, eta, eta2, chi1, chi2, xi)
     Dphase = -phenom_d_phase(MfRD, m1, m2, eta, eta2, chi1, chi2, xi)[1] * M_s
-    phase -= phic
+    phase -= phic + PI/4.0
     Amp = phenom_d_amp(Mf, m1, m2, eta, eta2, Seta, chi1, chi2, chi12, chi22, xi, dist_mpc)[0]
     Amp0 = get_Amp0(Mf, eta)
     dist_s = dist_mpc * MPC_SEC

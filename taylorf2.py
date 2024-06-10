@@ -195,8 +195,6 @@ def taylorf2_phase(
     phasing /= v5
     # Multiply by 0PN coefficient
     phasing = (phasing.T * pfaN).T
-    # subtract pi/4
-    phasing -= PI / 4.0
 
     # Derivative of phase w.r.t Mf
     # dPhi/dMf = dPhi/dv dv/dMf
