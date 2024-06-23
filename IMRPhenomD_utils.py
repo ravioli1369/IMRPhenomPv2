@@ -134,11 +134,11 @@ def get_transition_frequencies(
     return f1, f2, f3, f4, f_RD, f_damp
 
 
-@jax.jit
 def get_coeffs(theta: Array) -> Array:
     # Retrives the coefficients needed to produce the waveform
 
     m1, m2, chi1, chi2 = theta
+
     m1_s = m1 * gt
     m2_s = m2 * gt
     M_s = m1_s + m2_s

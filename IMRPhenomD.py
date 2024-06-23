@@ -18,6 +18,7 @@ import jax.numpy as jnp
 
 Array = jnp.ndarray
 
+
 def Mc_eta_to_ms(m):
     r"""
     Converts chirp mass and symmetric mass ratio to binary component masses.
@@ -472,7 +473,6 @@ def Phase(f: Array, theta: Array, coeffs: Array, transition_freqs: Array) -> Arr
         + jnp.heaviside(f - f1, 0.5) * phi_IIa * jnp.heaviside(f2 - f, 0.5)
         + phi_IIb * jnp.heaviside(f - f2, 0.5)
     )
-    
 
     return phase
 
@@ -509,7 +509,7 @@ def Amp(
     Amp_IIa = get_IIa_Amp(f * M_s, theta, coeffs, f3, f4, f_RD, f_damp)
     # And finally, we construct the amplitude of the merger-ringdown (region IIb)
     Amp_IIb = get_IIb_Amp(f * M_s, theta, coeffs, f_RD, f_damp)
-    
+
     # And now we can combine them by multiplying by a set of heaviside functions
     fcut_above = lambda f: (fM_CUT / M_s)
     fcut_below = lambda f: f[jnp.abs(f - (fM_CUT / M_s)).argmin() - 1]
@@ -522,9 +522,7 @@ def Amp(
     )
 
     # Prefactor
-    Amp0 = get_Amp0(f * M_s, eta) * (
-        2.0 * jnp.sqrt(5.0 / (64.0 * PI))
-    )  
+    Amp0 = get_Amp0(f * M_s, eta) * (2.0 * jnp.sqrt(5.0 / (64.0 * PI)))
     # This second factor is from lalsuite
     # Need to add in an overall scaling of M_s^2 to make the units correct
     dist_s = (D * m_per_Mpc) / C
