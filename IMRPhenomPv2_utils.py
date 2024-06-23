@@ -17,6 +17,7 @@ from IMRPhenomD_QNMdata import QNMData_a, QNMData_fRD, QNMData_fdamp
 
 Array = jnp.ndarray
 
+
 def Mc_eta_to_ms(m):
     r"""
     Converts chirp mass and symmetric mass ratio to binary component masses.
@@ -33,6 +34,7 @@ def Mc_eta_to_ms(m):
     m2 = (M - jnp.sqrt(M**2 - 4 * M**2 * eta)) / 2
     m1 = M - m2
     return m1, m2
+
 
 # helper functions for LALtoPhenomP:
 def ROTATEZ(angle, x, y, z):
