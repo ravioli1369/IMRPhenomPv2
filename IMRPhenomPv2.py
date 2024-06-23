@@ -12,6 +12,7 @@ from IMRPhenomD_utils import *
 
 Array = jnp.ndarray
 
+
 def Mc_eta_to_ms(m):
     r"""
     Converts chirp mass and symmetric mass ratio to binary component masses.
@@ -28,6 +29,7 @@ def Mc_eta_to_ms(m):
     m2 = (M - jnp.sqrt(M**2 - 4 * M**2 * eta)) / 2
     m1 = M - m2
     return m1, m2
+
 
 def PhenomPCoreTwistUp(
     fHz,
@@ -212,7 +214,6 @@ def gen_IMRPhenomPv2(
         + angcoeffs["epsiloncoeff4"] * logomega_ref
         + angcoeffs["epsiloncoeff5"] * omega_ref_cbrt
     )
-    
 
     Y2m2 = SpinWeightedY(thetaJN, 0, -2, 2, -2)
     Y2m1 = SpinWeightedY(thetaJN, 0, -2, 2, -1)
@@ -231,8 +232,7 @@ def gen_IMRPhenomPv2(
 
     hPhenomDs, phi_IIb = PhenomPOneFrequency(
         fs, m2, m1, chi2_l, chi1_l, chip, phic, M, dist_mpc, coeffs, transition_freqs
-    )    
-
+    )
 
     hp, hc = PhenomPCoreTwistUp(
         fs,
