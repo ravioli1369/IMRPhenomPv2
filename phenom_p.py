@@ -34,7 +34,6 @@ class IMRPhenomPv2(IMRPhenomD):
 
         m2 = chirp_mass * (1.0 + mass_ratio) ** 0.2 / mass_ratio**0.6
         m1 = m2 * mass_ratio
-        print(m1, m2)
 
         # # flip m1 m2. For some reason LAL uses this convention for PhenomPv2
         m1, m2 = m2, m1
