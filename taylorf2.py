@@ -1,6 +1,8 @@
 import torch
 from torchtyping import TensorType
-from constants import EulerGamma as GAMMA, MTSUN_SI, PI, MPC_SEC
+
+from constants import MPC_SEC, MTSUN_SI, PI
+from constants import EulerGamma as GAMMA
 
 
 class TaylorF2(torch.nn.Module):
@@ -10,8 +12,8 @@ class TaylorF2(torch.nn.Module):
     def forward(
         self,
         f: TensorType,
-        mass1: TensorType,
-        mass2: TensorType,
+        chirp_mass: TensorType,
+        mass_ratio: TensorType,
         chi1: TensorType,
         chi2: TensorType,
         distance: TensorType,
@@ -28,14 +30,16 @@ class TaylorF2(torch.nn.Module):
         """
         # shape assumed (n_batch, params)
         if (
-            mass1.shape[0] != mass2.shape[0]
-            or mass2.shape[0] != chi1.shape[0]
+            chirp_mass.shape[0] != mass_ratio.shape[0]
+            or chirp_mass.shape[0] != chi1.shape[0]
             or chi1.shape[0] != chi2.shape[0]
             or chi2.shape[0] != distance.shape[0]
             or distance.shape[0] != phic.shape[0]
             or phic.shape[0] != inclination.shape[0]
         ):
             raise RuntimeError("Tensors should have same batch size")
+        mass1 = chirp_mass * (1.0 + mass_ratio) ** 0.2 / mass_ratio**0.6
+        mass2 = mass_ratio * mass1
         cfac = torch.cos(inclination)
         pfac = 0.5 * (1.0 + cfac * cfac)
 

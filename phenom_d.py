@@ -1,16 +1,17 @@
 import torch
-from taylorf2 import TaylorF2
 from torchtyping import TensorType
+
 from constants import MTSUN_SI, PI
 from phenom_d_data import QNMData_a, QNMData_fdamp, QNMData_fring
+from taylorf2 import TaylorF2
 
 
 class IMRPhenomD(TaylorF2):
     def __init__(self):
         super().__init__()
-        self.register_buffer("QNMData_a", QNMData_a)
-        self.register_buffer("QNMData_fdamp", QNMData_fdamp)
-        self.register_buffer("QNMData_fring", QNMData_fring)
+        self.register_buffer("qnmdata_a", QNMData_a)
+        self.register_buffer("qnmdata_fdamp", QNMData_fdamp)
+        self.register_buffer("qnmdata_fring", QNMData_fring)
 
     def forward(
         self,
@@ -480,9 +481,9 @@ class IMRPhenomD(TaylorF2):
 
     def phenom_d_inspiral_phase(self, Mf, mass_1, mass_2, eta, eta2, xi, chi1, chi2):
         ins_phasing, ins_Dphasing = self.taylorf2_phase(Mf, mass_1, mass_2, chi1, chi2)
-        # subtract 3PN spin-spin term as this is in LAL's TaylorF2 implementation,
-        #  but was not available when PhenomD was tuned.
-        # refer https://git.ligo.org/lscsoft/lalsuite/-/blob/master/lalsimulation/lib/LALSimIMRPhenomD.c#L397-398
+        # subtract 3PN spin-spin term as this is in LAL's TaylorF2
+        # implementation, but was not available when PhenomD was tuned.
+        # refer https://git.ligo.org/lscsoft/lalsuite/-/blob/master/lalsimulation/lib/LALSimIMRPhenomD.c#L397-398 # noqa: E501
         pn_ss3, Dpn_ss3 = self.subtract3PNSS(
             Mf, mass_1, mass_2, eta, eta2, xi, chi1, chi2
         )
@@ -531,24 +532,24 @@ class IMRPhenomD(TaylorF2):
 
     def _linear_interp_finspin(self, finspin):
         # chi is a batch of final spins i.e. torch.Size([n])
-        right_spin_idx = torch.bucketize(finspin, QNMData_a)
-        right_spin_val = QNMData_a[right_spin_idx]
+        right_spin_idx = torch.bucketize(finspin, self.qnmdata_a)
+        right_spin_val = self.qnmdata_a[right_spin_idx]
         # QNMData_a is sorted, hence take the previous index
         left_spin_idx = right_spin_idx - 1
-        left_spin_val = QNMData_a[left_spin_idx]
+        left_spin_val = self.qnmdata_a[left_spin_idx]
 
         if not torch.all(left_spin_val < right_spin_val):
             raise RuntimeError(
                 "Left value in grid should be greater than right. "
                 "Maybe be caused for extremal spin values."
             )
-        left_fring = QNMData_fring[left_spin_idx]
-        right_fring = QNMData_fring[right_spin_idx]
+        left_fring = self.qnmdata_fring[left_spin_idx]
+        right_fring = self.qnmdata_fring[right_spin_idx]
         slope_fring = right_fring - left_fring
         slope_fring /= right_spin_val - left_spin_val
 
-        left_fdamp = QNMData_fdamp[left_spin_idx]
-        right_fdamp = QNMData_fdamp[right_spin_idx]
+        left_fdamp = self.qnmdata_fdamp[left_spin_idx]
+        right_fdamp = self.qnmdata_fdamp[right_spin_idx]
         slope_fdamp = right_fdamp - left_fdamp
         slope_fdamp /= right_spin_val - left_spin_val
 
