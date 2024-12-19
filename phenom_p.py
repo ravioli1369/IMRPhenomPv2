@@ -1,3 +1,8 @@
+"""
+    Based on the JAX implementation of IMRPhenomPv2 from 
+    https://github.com/tedwards2412/ripple/blob/main/src/ripplegw/waveforms/IMRPhenomPv2.py
+"""
+
 from typing import Dict, Optional, Tuple
 
 import torch
@@ -171,9 +176,7 @@ class IMRPhenomPv2(IMRPhenomD):
             alphaNNLOoffset - alpha0,
             epsilonNNLOoffset,
         )
-        # breakpoint()
         t0 = (diffRDphase.unsqueeze(1)) / (2 * PI)
-        print(t0)
         phase_corr = torch.cos(2 * PI * fs * (t0)) - 1j * torch.sin(2 * PI * fs * (t0))
         M_s = (m1 + m2) * MTSUN_SI
         phase_corr_tc = torch.exp(-1j * fs * M_s.unsqueeze(1) * tc.unsqueeze(1))
@@ -308,7 +311,6 @@ class IMRPhenomPv2(IMRPhenomD):
         M_s = M * MTSUN_SI
         Mf = torch.outer(M_s, fs)
         fRD, _ = self.phP_get_fRD_fdamp(m1, m2, chi1, chi2, chip)
-        fRD = torch.tensor([298.6057])
         phase, _ = self.phenom_d_phase(Mf, m1, m2, eta, eta2, chi1, chi2, xi)
         phase = (phase.mT - (phic + PI / 4.0)).mT
         Amp = self.phenom_d_amp(
@@ -319,9 +321,10 @@ class IMRPhenomPv2(IMRPhenomD):
         Amp = ((Amp0 * Amp).mT * (M_s**2.0) / dist_s).mT
         # phase -= 2. * phic; # line 1316 ???
         hPhenom = Amp * (torch.exp(-1j * phase))
-        # breakpoint()
-        n_fixed = 10
-        fRDs = torch.outer(fRD, torch.linspace(0.8, 1.2, n_fixed, device=fRD.device))
+
+        n_fixed = 1000
+        x = torch.linspace(0.8, 1.2, n_fixed, device=fRD.device)
+        fRDs = torch.outer(fRD, x)
         delta_fRds = (1.2 * fRD - 0.8 * fRD) / (n_fixed - 1)
         MfRDs = torch.zeros_like(fRDs)
         for i in range(fRD.shape[0]):
@@ -329,12 +332,7 @@ class IMRPhenomPv2(IMRPhenomD):
         RD_phase = self.phenom_d_phase(MfRDs, m1, m2, eta, eta2, chi1, chi2, xi)[0]
         diff = torch.diff(RD_phase, axis=1)
         diffRDphase = (diff[:, 1:] + diff[:, :-1]) / (2 * delta_fRds.unsqueeze(1))
-        diffRDphase = -diffRDphase[:, 4]
-        # MfRD = torch.outer(M_s, fRD)
-        # Dphase = torch.diag(
-        #     -self.phenom_d_phase(
-        #         MfRD, m1, m2, eta, eta2, chi1, chi2, xi)[1] * M_s
-        # ).view(-1, 1)
+        diffRDphase = -self.interpolate(torch.tensor([1]), x[1:-1], diffRDphase)
         return hPhenom, diffRDphase
 
     # Utility functions

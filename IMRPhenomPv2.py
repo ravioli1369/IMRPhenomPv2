@@ -248,10 +248,8 @@ def gen_IMRPhenomPv2(
         alphaNNLOoffset - alpha0,
         epsilonNNLOoffset,
     )
-    # breakpoint()
     # unpack transition_freqs
     _, _, _, _, f_RD, _ = transition_freqs
-    print(f_RD)
     t0 = jax.grad(phi_IIb)(f_RD) / (2 * jnp.pi)
     phase_corr = jnp.cos(2 * jnp.pi * fs * (t0)) - 1j * jnp.sin(2 * jnp.pi * fs * (t0))
     M_s = (m1 + m2) * gt
