@@ -822,30 +822,6 @@ static int PhenomPCore (COMPLEX16FrequencySeries ** hptilde,
   for (int i = 0; i < n_fixed; i++)
 	freqs_fixed->data[i] = freqs_fixed_start + i * delta_freqs_fixed;
 
-  /* Recompute tidal corrections if needed */
-  if (IMRPhenomP_version == IMRPhenomPv2NRTidal_V)
-	{
-	  /* Generating the NR tidal amplitude and phase for the fixed grid */
-	  /* Get FD tidal phase correction and amplitude factor from arXiv:1706.02969 */
-	  phi_tidal_fixed = XLALCreateREAL8Sequence (n_fixed);
-	  amp_tidal_fixed = XLALCreateREAL8Sequence (n_fixed);
-	  planck_taper_fixed = XLALCreateREAL8Sequence (n_fixed);
-	  ret =
-		XLALSimNRTunedTidesFDTidalPhaseFrequencySeries (phi_tidal_fixed,
-														amp_tidal_fixed,
-														planck_taper_fixed,
-														freqs_fixed, m1_SI,
-														m2_SI, lambda1,
-														lambda2,
-														NRTidal_version);
-	  XLAL_CHECK (XLAL_SUCCESS == ret, ret,
-				  "XLALSimNRTunedTidesFDTidalPhaseFrequencySeries Failed.");
-	  if (NRTidal_version == NRTidalv2_V)
-		XLALSimInspiralGetHOSpinTerms (&SS_3p5PN_n, &SSS_3p5PN_n, X_A, X_B,
-									   chi1_l, chi2_l, quadparam1,
-									   quadparam2);
-	}
-
   /* We need another loop to generate the phase values on the fixed grid; no need for OpenMP here */
   for (int i = 0; i < n_fixed; i++)
 	{							// loop over frequency points in sequence

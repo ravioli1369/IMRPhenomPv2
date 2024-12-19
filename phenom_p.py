@@ -83,7 +83,6 @@ class IMRPhenomPv2(IMRPhenomD):
         s1x, s2x = s2x, s1x
         s1y, s2y = s2y, s1y
         s1z, s2z = s2z, s1z
-
         (
             chi1_l,
             chi2_l,
@@ -172,7 +171,9 @@ class IMRPhenomPv2(IMRPhenomD):
             alphaNNLOoffset - alpha0,
             epsilonNNLOoffset,
         )
+        # breakpoint()
         t0 = (diffRDphase.unsqueeze(1)) / (2 * PI)
+        print(t0)
         phase_corr = torch.cos(2 * PI * fs * (t0)) - 1j * torch.sin(2 * PI * fs * (t0))
         M_s = (m1 + m2) * MTSUN_SI
         phase_corr_tc = torch.exp(-1j * fs * M_s.unsqueeze(1) * tc.unsqueeze(1))
@@ -304,11 +305,10 @@ class IMRPhenomPv2(IMRPhenomD):
         phic: Orbital phase at peak of the underlying non precessing model
         M: Total mass (Solar masses)
         """
-
         M_s = M * MTSUN_SI
         Mf = torch.outer(M_s, fs)
         fRD, _ = self.phP_get_fRD_fdamp(m1, m2, chi1, chi2, chip)
-
+        fRD = torch.tensor([298.6057])
         phase, _ = self.phenom_d_phase(Mf, m1, m2, eta, eta2, chi1, chi2, xi)
         phase = (phase.mT - (phic + PI / 4.0)).mT
         Amp = self.phenom_d_amp(
@@ -319,16 +319,17 @@ class IMRPhenomPv2(IMRPhenomD):
         Amp = ((Amp0 * Amp).mT * (M_s**2.0) / dist_s).mT
         # phase -= 2. * phic; # line 1316 ???
         hPhenom = Amp * (torch.exp(-1j * phase))
-
-        fRDs = torch.outer(fRD, torch.linspace(0.5, 1.5, 101, device=fRD.device))
-        delta_fRds = torch.median(torch.diff(fRDs, axis=1), axis=1)[0]
+        # breakpoint()
+        n_fixed = 10
+        fRDs = torch.outer(fRD, torch.linspace(0.8, 1.2, n_fixed, device=fRD.device))
+        delta_fRds = (1.2 * fRD - 0.8 * fRD) / (n_fixed - 1)
         MfRDs = torch.zeros_like(fRDs)
         for i in range(fRD.shape[0]):
             MfRDs[i, :] = torch.outer(M_s, fRDs[i, :])[i, :]
         RD_phase = self.phenom_d_phase(MfRDs, m1, m2, eta, eta2, chi1, chi2, xi)[0]
         diff = torch.diff(RD_phase, axis=1)
         diffRDphase = (diff[:, 1:] + diff[:, :-1]) / (2 * delta_fRds.unsqueeze(1))
-        diffRDphase = -diffRDphase[:, 50]
+        diffRDphase = -diffRDphase[:, 4]
         # MfRD = torch.outer(M_s, fRD)
         # Dphase = torch.diag(
         #     -self.phenom_d_phase(
@@ -745,6 +746,7 @@ class IMRPhenomPv2(IMRPhenomD):
         eta_s = m1_s * m2_s / (M_s**2.0)
         eta_s2 = eta_s * eta_s
         Erad = self.PhenomInternal_EradRational0815(eta_s, eta_s2, chi1_l, chi2_l)
+        breakpoint()
         fRD = self.interpolate(finspin, self.qnmdata_a, self.qnmdata_fring) / (
             1.0 - Erad
         )
