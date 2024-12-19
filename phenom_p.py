@@ -1,9 +1,13 @@
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 import torch
-from torchtyping import TensorType
+from jaxtyping import Float
+from torch import Tensor
 
 from constants import MPC_SEC, MTSUN_SI, PI
+from types_ml4gw import BatchTensor, FrequencySeries1d
+from conversion import rotate_y, rotate_z
+
 from phenom_d import IMRPhenomD
 
 
@@ -13,24 +17,63 @@ class IMRPhenomPv2(IMRPhenomD):
 
     def forward(
         self,
-        fs: TensorType,
-        chirp_mass: TensorType,
-        mass_ratio: TensorType,
-        s1x: TensorType,
-        s1y: TensorType,
-        s1z: TensorType,
-        s2x: TensorType,
-        s2y: TensorType,
-        s2z: TensorType,
-        dist_mpc: TensorType,
-        tc: TensorType,
-        phiRef: TensorType,
-        incl: TensorType,
+        fs: FrequencySeries1d,
+        chirp_mass: BatchTensor,
+        mass_ratio: BatchTensor,
+        s1x: BatchTensor,
+        s1y: BatchTensor,
+        s1z: BatchTensor,
+        s2x: BatchTensor,
+        s2y: BatchTensor,
+        s2z: BatchTensor,
+        distance: BatchTensor,
+        phic: BatchTensor,
+        inclination: BatchTensor,
         f_ref: float,
+        tc: Optional[BatchTensor] = None,
     ):
         """
-        m1 must be larger than m2.
+        IMRPhenomPv2 waveform
+
+        Args:
+            fs :
+                Frequency series in Hz.
+            chirp_mass :
+                Chirp mass in solar masses.
+            mass_ratio :
+                Mass ratio m1/m2.
+            s1x :
+                Spin component x of the first BH.
+            s1y :
+                Spin component y of the first BH.
+            s1z :
+                Spin component z of the first BH.
+            s2x :
+                Spin component x of the second BH.
+            s2y :
+                Spin component y of the second BH.
+            s2z :
+                Spin component z of the second BH.
+            distance :
+                Luminosity distance in Mpc.
+            tc :
+                Coalescence time.
+            phic :
+                Reference phase.
+            inclination :
+                Inclination angle.
+            f_ref :
+                Reference frequency in Hz.
+
+        Returns:
+            hc, hp: Tuple[torch.Tensor, torch.Tensor]
+                Cross and plus polarizations
+
+        Note: m1 must be larger than m2.
         """
+
+        if tc is None:
+            tc = torch.zeros_like(chirp_mass)
 
         m2 = chirp_mass * (1.0 + mass_ratio) ** 0.2 / mass_ratio**0.6
         m1 = m2 * mass_ratio
@@ -50,7 +93,7 @@ class IMRPhenomPv2(IMRPhenomD):
             phi_aligned,
             zeta_polariz,
         ) = self.convert_spins(
-            m1, m2, f_ref, phiRef, incl, s1x, s1y, s1z, s2x, s2y, s2z
+            m1, m2, f_ref, phic, inclination, s1x, s1y, s1z, s2x, s2y, s2z
         )
 
         phic = 2 * phi_aligned
@@ -113,7 +156,7 @@ class IMRPhenomPv2(IMRPhenomD):
             phic,
             M,
             xi,
-            dist_mpc,
+            distance,
         )
 
         hp, hc = self.PhenomPCoreTwistUp(
@@ -140,22 +183,22 @@ class IMRPhenomPv2(IMRPhenomD):
         s2z = torch.sin(2 * zeta_polariz).unsqueeze(1)
         hplus = c2z * hp + s2z * hc
         hcross = c2z * hc - s2z * hp
-        return hplus, hcross
+        return hcross, hplus
 
     def PhenomPCoreTwistUp(
         self,
-        fHz: TensorType,
-        hPhenom: TensorType,
-        eta: TensorType,
-        chi1_l: TensorType,
-        chi2_l: TensorType,
-        chip: TensorType,
-        M: TensorType,
-        angcoeffs: Dict[str, TensorType],
-        Y2m: TensorType,
-        alphaoffset: TensorType,
-        epsilonoffset: TensorType,
-    ) -> Tuple[TensorType, TensorType]:
+        fHz: FrequencySeries1d,
+        hPhenom: BatchTensor,
+        eta: BatchTensor,
+        chi1_l: BatchTensor,
+        chi2_l: BatchTensor,
+        chip: BatchTensor,
+        M: BatchTensor,
+        angcoeffs: Dict[str, BatchTensor],
+        Y2m: BatchTensor,
+        alphaoffset: BatchTensor,
+        epsilonoffset: BatchTensor,
+    ) -> Tuple[BatchTensor, BatchTensor]:
         assert angcoeffs is not None
         assert Y2m is not None
         f = fHz * MTSUN_SI * M.unsqueeze(1)  # Frequency in geometric units
@@ -254,7 +297,7 @@ class IMRPhenomPv2(IMRPhenomD):
         phic,
         M,
         xi,
-        dist_mpc,
+        distance,
     ):
         """
         m1, m2: in solar masses
@@ -269,10 +312,10 @@ class IMRPhenomPv2(IMRPhenomD):
         phase, _ = self.phenom_d_phase(Mf, m1, m2, eta, eta2, chi1, chi2, xi)
         phase = (phase.mT - (phic + PI / 4.0)).mT
         Amp = self.phenom_d_amp(
-            Mf, m1, m2, eta, eta2, Seta, chi1, chi2, chi12, chi22, xi, dist_mpc
+            Mf, m1, m2, eta, eta2, Seta, chi1, chi2, chi12, chi22, xi, distance
         )[0]
         Amp0 = self.get_Amp0(Mf, eta)
-        dist_s = dist_mpc * MPC_SEC
+        dist_s = distance * MPC_SEC
         Amp = ((Amp0 * Amp).mT * (M_s**2.0) / dist_s).mT
         # phase -= 2. * phic; # line 1316 ???
         hPhenom = Amp * (torch.exp(-1j * phase))
@@ -295,7 +338,12 @@ class IMRPhenomPv2(IMRPhenomD):
 
     # Utility functions
 
-    def interpolate(self, x: TensorType, xp: TensorType, fp: TensorType) -> TensorType:
+    def interpolate(
+        self,
+        x: Float[Tensor, " new_series"],
+        xp: Float[Tensor, " series"],
+        fp: Float[Tensor, " series"],
+    ) -> Float[Tensor, " new_series"]:
         """One-dimensional linear interpolation for monotonically
         increasing sample points.
 
@@ -325,17 +373,11 @@ class IMRPhenomPv2(IMRPhenomD):
 
         return interpolated.reshape(original_shape)
 
-    def ROTATEZ(self, angle: TensorType, x, y, z):
-        tmp_x = x * torch.cos(angle) - y * torch.sin(angle)
-        tmp_y = x * torch.sin(angle) + y * torch.cos(angle)
-        return tmp_x, tmp_y, z
-
-    def ROTATEY(self, angle, x, y, z):
-        tmp_x = x * torch.cos(angle) + z * torch.sin(angle)
-        tmp_z = -x * torch.sin(angle) + z * torch.cos(angle)
-        return tmp_x, y, tmp_z
-
-    def L2PNR(self, v: TensorType, eta: TensorType) -> TensorType:
+    def L2PNR(
+        self,
+        v: BatchTensor,
+        eta: BatchTensor,
+    ) -> BatchTensor:
         eta2 = eta**2
         x = v**2
         x2 = x**2
@@ -352,25 +394,25 @@ class IMRPhenomPv2(IMRPhenomD):
 
     def convert_spins(
         self,
-        m1: TensorType,
-        m2: TensorType,
+        m1: BatchTensor,
+        m2: BatchTensor,
         f_ref: float,
-        phiRef: TensorType,
-        incl: TensorType,
-        s1x: TensorType,
-        s1y: TensorType,
-        s1z: TensorType,
-        s2x: TensorType,
-        s2y: TensorType,
-        s2z: TensorType,
+        phic: BatchTensor,
+        inclination: BatchTensor,
+        s1x: BatchTensor,
+        s1y: BatchTensor,
+        s1z: BatchTensor,
+        s2x: BatchTensor,
+        s2y: BatchTensor,
+        s2z: BatchTensor,
     ) -> Tuple[
-        TensorType,
-        TensorType,
-        TensorType,
-        TensorType,
-        TensorType,
-        TensorType,
-        TensorType,
+        BatchTensor,
+        BatchTensor,
+        BatchTensor,
+        BatchTensor,
+        BatchTensor,
+        BatchTensor,
+        BatchTensor,
     ]:
         M = m1 + m2
         m1_2 = m1 * m1
@@ -416,32 +458,32 @@ class IMRPhenomPv2(IMRPhenomD):
         # First we determine kappa
         # in the source frame, the components of N are given in
         # Eq (35c) of T1500606-v6
-        Nx_sf = torch.sin(incl) * torch.cos(PI / 2.0 - phiRef)
-        Ny_sf = torch.sin(incl) * torch.sin(PI / 2.0 - phiRef)
-        Nz_sf = torch.cos(incl)
+        Nx_sf = torch.sin(inclination) * torch.cos(PI / 2.0 - phic)
+        Ny_sf = torch.sin(inclination) * torch.sin(PI / 2.0 - phic)
+        Nz_sf = torch.cos(inclination)
 
         tmp_x = Nx_sf
         tmp_y = Ny_sf
         tmp_z = Nz_sf
 
-        tmp_x, tmp_y, tmp_z = self.ROTATEZ(-phiJ_sf, tmp_x, tmp_y, tmp_z)
-        tmp_x, tmp_y, tmp_z = self.ROTATEY(-thetaJ_sf, tmp_x, tmp_y, tmp_z)
+        tmp_x, tmp_y, tmp_z = rotate_z(-phiJ_sf, tmp_x, tmp_y, tmp_z)
+        tmp_x, tmp_y, tmp_z = rotate_y(-thetaJ_sf, tmp_x, tmp_y, tmp_z)
 
         kappa = -torch.arctan2(tmp_y, tmp_x)
 
         # Then we determine alpha0, by rotating LN
         tmp_x, tmp_y, tmp_z = 0, 0, 1
-        tmp_x, tmp_y, tmp_z = self.ROTATEZ(-phiJ_sf, tmp_x, tmp_y, tmp_z)
-        tmp_x, tmp_y, tmp_z = self.ROTATEY(-thetaJ_sf, tmp_x, tmp_y, tmp_z)
-        tmp_x, tmp_y, tmp_z = self.ROTATEZ(kappa, tmp_x, tmp_y, tmp_z)
+        tmp_x, tmp_y, tmp_z = rotate_z(-phiJ_sf, tmp_x, tmp_y, tmp_z)
+        tmp_x, tmp_y, tmp_z = rotate_y(-thetaJ_sf, tmp_x, tmp_y, tmp_z)
+        tmp_x, tmp_y, tmp_z = rotate_z(kappa, tmp_x, tmp_y, tmp_z)
 
         alpha0 = torch.arctan2(tmp_y, tmp_x)
 
         # Finally we determine thetaJ, by rotating N
         tmp_x, tmp_y, tmp_z = Nx_sf, Ny_sf, Nz_sf
-        tmp_x, tmp_y, tmp_z = self.ROTATEZ(-phiJ_sf, tmp_x, tmp_y, tmp_z)
-        tmp_x, tmp_y, tmp_z = self.ROTATEY(-thetaJ_sf, tmp_x, tmp_y, tmp_z)
-        tmp_x, tmp_y, tmp_z = self.ROTATEZ(kappa, tmp_x, tmp_y, tmp_z)
+        tmp_x, tmp_y, tmp_z = rotate_z(-phiJ_sf, tmp_x, tmp_y, tmp_z)
+        tmp_x, tmp_y, tmp_z = rotate_y(-thetaJ_sf, tmp_x, tmp_y, tmp_z)
+        tmp_x, tmp_y, tmp_z = rotate_z(kappa, tmp_x, tmp_y, tmp_z)
         Nx_Jf, Nz_Jf = tmp_x, tmp_z
         thetaJN = torch.arccos(Nz_Jf)
 
@@ -458,13 +500,13 @@ class IMRPhenomPv2(IMRPhenomD):
         # Both triads differ from each other by a rotation around N by an angle
         # \zeta and we need to rotate the polarizations accordingly by 2\zeta
 
-        Xx_sf = -torch.cos(incl) * torch.sin(phiRef)
-        Xy_sf = -torch.cos(incl) * torch.cos(phiRef)
-        Xz_sf = torch.sin(incl)
+        Xx_sf = -torch.cos(inclination) * torch.sin(phic)
+        Xy_sf = -torch.cos(inclination) * torch.cos(phic)
+        Xz_sf = torch.sin(inclination)
         tmp_x, tmp_y, tmp_z = Xx_sf, Xy_sf, Xz_sf
-        tmp_x, tmp_y, tmp_z = self.ROTATEZ(-phiJ_sf, tmp_x, tmp_y, tmp_z)
-        tmp_x, tmp_y, tmp_z = self.ROTATEY(-thetaJ_sf, tmp_x, tmp_y, tmp_z)
-        tmp_x, tmp_y, tmp_z = self.ROTATEZ(kappa, tmp_x, tmp_y, tmp_z)
+        tmp_x, tmp_y, tmp_z = rotate_z(-phiJ_sf, tmp_x, tmp_y, tmp_z)
+        tmp_x, tmp_y, tmp_z = rotate_y(-thetaJ_sf, tmp_x, tmp_y, tmp_z)
+        tmp_x, tmp_y, tmp_z = rotate_z(kappa, tmp_x, tmp_y, tmp_z)
 
         # Now the tmp_a are the components of X in the J frame
         # We need the polar angle of that vector in the P,Q basis of Arun et al
@@ -531,8 +573,12 @@ class IMRPhenomPv2(IMRPhenomD):
                 )
 
     def WignerdCoefficients(
-        self, v: TensorType, SL: TensorType, eta: TensorType, Sp: TensorType
-    ) -> Tuple[TensorType, TensorType]:
+        self,
+        v: BatchTensor,
+        SL: BatchTensor,
+        eta: BatchTensor,
+        Sp: BatchTensor,
+    ) -> Tuple[BatchTensor, BatchTensor]:
         # We define the shorthand s := Sp / (L + SL)
         L = self.L2PNR(v, eta)
         s = (Sp / (L + SL)).mT
@@ -544,8 +590,11 @@ class IMRPhenomPv2(IMRPhenomD):
         return cos_beta_half, sin_beta_half
 
     def ComputeNNLOanglecoeffs(
-        self, q: TensorType, chil: TensorType, chip: TensorType
-    ) -> Dict[str, TensorType]:
+        self,
+        q: BatchTensor,
+        chil: BatchTensor,
+        chip: BatchTensor,
+    ) -> Dict[str, BatchTensor]:
         m2 = q / (1.0 + q)
         m1 = 1.0 / (1.0 + q)
         dm = m1 - m2
@@ -666,12 +715,12 @@ class IMRPhenomPv2(IMRPhenomD):
 
     def FinalSpin_inplane(
         self,
-        m1: TensorType,
-        m2: TensorType,
-        chi1_l: TensorType,
-        chi2_l: TensorType,
-        chip: TensorType,
-    ) -> TensorType:
+        m1: BatchTensor,
+        m2: BatchTensor,
+        chi1_l: BatchTensor,
+        chi2_l: BatchTensor,
+        chip: BatchTensor,
+    ) -> BatchTensor:
         M = m1 + m2
         eta = m1 * m2 / (M * M)
         eta2 = eta * eta
@@ -687,7 +736,7 @@ class IMRPhenomPv2(IMRPhenomD):
 
     def phP_get_fRD_fdamp(
         self, m1, m2, chi1_l, chi2_l, chip
-    ) -> Tuple[TensorType, TensorType]:
+    ) -> Tuple[BatchTensor, BatchTensor]:
         # m1 > m2 should hold here
         finspin = self.FinalSpin_inplane(m1, m2, chi1_l, chi2_l, chip)
         m1_s = m1 * MTSUN_SI
@@ -704,7 +753,7 @@ class IMRPhenomPv2(IMRPhenomD):
         )
         return fRD / M_s, fdamp / M_s
 
-    def get_Amp0(self, fM_s: TensorType, eta: TensorType) -> TensorType:
+    def get_Amp0(self, fM_s: BatchTensor, eta: BatchTensor) -> BatchTensor:
         Amp0 = (
             (2.0 / 3.0 * eta.unsqueeze(1)) ** (1.0 / 2.0)
             * (fM_s) ** (-7.0 / 6.0)
