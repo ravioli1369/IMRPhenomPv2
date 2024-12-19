@@ -74,7 +74,7 @@ fs_ripple = jnp.arange(f_l, f_u, df)[1:]
 fs_torch = Tensor(np.arange(f_l, f_u, df)[1:])
 
 
-# hp_ripple, hc_ripple = gen_IMRPhenomPv2(fs_ripple, theta_ripple, f_ref)
+#hp_ripple, hc_ripple = gen_IMRPhenomPv2(fs_ripple, theta_ripple, f_ref)
 hp_torch, hc_torch = IMRPhenomPv2().forward(
     fs_torch,
     chirp_mass,

@@ -727,9 +727,9 @@ class IMRPhenomPv2(IMRPhenomD):
         eta2 = eta * eta
         # m1 > m2, the convention used in phenomD
         # (not the convention of internal phenomP)
-        mass_ratio = m1 / m2
+        q_factor = m1 / M
         af_parallel = self.FinalSpin0815(eta, eta2, chi1_l, chi2_l)
-        Sperp = chip * mass_ratio * mass_ratio
+        Sperp = chip * q_factor * q_factor
         af = torch.copysign(torch.ones_like(af_parallel), af_parallel) * torch.sqrt(
             Sperp * Sperp + af_parallel * af_parallel
         )
@@ -746,7 +746,6 @@ class IMRPhenomPv2(IMRPhenomD):
         eta_s = m1_s * m2_s / (M_s**2.0)
         eta_s2 = eta_s * eta_s
         Erad = self.PhenomInternal_EradRational0815(eta_s, eta_s2, chi1_l, chi2_l)
-        breakpoint()
         fRD = self.interpolate(finspin, self.qnmdata_a, self.qnmdata_fring) / (
             1.0 - Erad
         )

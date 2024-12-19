@@ -387,7 +387,6 @@ def phP_get_fRD_fdamp(m1, m2, chi1_l, chi2_l, chip):
     M_s = m1_s + m2_s
     eta_s = m1_s * m2_s / (M_s**2.0)
     Erad = EradRational0815(eta_s, chi1_l, chi2_l)
-    breakpoint()
     fRD = jnp.interp(finspin, QNMData_a, QNMData_fRD) / (1.0 - Erad)
     fdamp = jnp.interp(finspin, QNMData_a, QNMData_fdamp) / (1.0 - Erad)
 
