@@ -2,11 +2,9 @@ import lal
 import torch
 import numpy as np
 import jax.numpy as jnp
-import lalsimulation as lalsim
-import matplotlib.pyplot as plt
 from torch import Tensor
 from phenom_p import IMRPhenomPv2
-from IMRPhenomPv2 import gen_IMRPhenomPv2_hphc, gen_IMRPhenomPv2
+from IMRPhenomPv2 import gen_IMRPhenomPv2
 
 
 def ms_to_Mc_eta(m):
@@ -61,10 +59,10 @@ theta_ripple = jnp.array(
         m1_msun.item(),
         m2_msun.item(),
         chi1x.item(),
-        0.0,
+        chi1y.item(),
         chi1z.item(),
         chi2x.item(),
-        0.0,
+        chi2y.item(),
         chi2z.item(),
         dist_mpc.item(),
         tc.item(),
@@ -88,10 +86,10 @@ if args.torch:
         chirp_mass,
         mass_ratio,
         chi1x,
-        Tensor([0.0]),
+        chi1y,
         chi1z,
         chi2x,
-        Tensor([0.0]),
+        chi2y,
         chi2z,
         dist_mpc,
         phic,
