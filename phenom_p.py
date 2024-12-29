@@ -11,7 +11,7 @@ from torch import Tensor
 
 from constants import MPC_SEC, MTSUN_SI, PI
 from types_ml4gw import BatchTensor, FrequencySeries1d
-from conversion import rotate_y, rotate_z
+from conversion import rotate_y, rotate_z, chirp_mass_and_mass_ratio_to_components
 
 from phenom_d import IMRPhenomD
 
@@ -80,8 +80,7 @@ class IMRPhenomPv2(IMRPhenomD):
         if tc is None:
             tc = torch.zeros_like(chirp_mass)
 
-        m2 = chirp_mass * (1.0 + mass_ratio) ** 0.2 / mass_ratio**0.6
-        m1 = m2 * mass_ratio
+        m1, m2 = chirp_mass_and_mass_ratio_to_components(chirp_mass, mass_ratio)
 
         # # flip m1 m2. For some reason LAL uses this convention for PhenomPv2
         m1, m2 = m2, m1
