@@ -1,6 +1,7 @@
 # from math import pi
 
 import jax
+import numpy as np
 import jax.numpy as jnp
 from IMRPhenomD_utils import (
     get_coeffs,
