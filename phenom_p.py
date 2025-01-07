@@ -355,8 +355,10 @@ class IMRPhenomPv2(IMRPhenomD):
         )[0]
         diff = torch.diff(RD_phase, axis=1)
         diffRDphase = (diff[:, 1:] + diff[:, :-1]) / (2 * delta_fRds.unsqueeze(1))
+        # reshape x to have same shape as diffRDphase
+        x = x[1:-1].unsqueeze(0).expand(diffRDphase.shape)
         # interpolate at x = 1, as thats the same as f = fRD
-        diffRDphase = -self.interpolate(torch.tensor([1]), x[1:-1], diffRDphase)
+        diffRDphase = -self.interpolate(torch.tensor([1]), x, diffRDphase)
         return hPhenom, diffRDphase
 
     # Utility functions
